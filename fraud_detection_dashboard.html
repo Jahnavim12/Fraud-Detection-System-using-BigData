@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FraudShield — Big Data Detection Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #080c12;
+    --bg2: #0d1420;
+    --bg3: #111a28;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8edf5;
+    --muted: #6b7a94;
+    --accent: #00d4aa;
+    --accent2: #0084ff;
+    --danger: #ff4d6a;
+    --warn: #ffb547;
+    --green: #00d4aa;
+    --purple: #a78bfa;
+    --card-bg: rgba(255,255,255,0.03);
+    --card-border: rgba(255,255,255,0.07);
+    --radius: 14px;
+    --glow-green: 0 0 30px rgba(0,212,170,0.15);
+    --glow-blue: 0 0 30px rgba(0,132,255,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Ambient glow blobs */
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(90px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.25;
+  }
+  .blob-1 { width: 500px; height: 500px; background: #00d4aa; top: -150px; left: -100px; }
+  .blob-2 { width: 400px; height: 400px; background: #0084ff; bottom: -100px; right: -80px; }
+  .blob-3 { width: 300px; height: 300px; background: #a78bfa; top: 40%; left: 40%; }
+
+  .app { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 0 24px 40px; }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, #00d4aa, #0084ff);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25);
+    padding: 5px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 500; color: var(--accent);
+    font-family: 'DM Mono', monospace;
+  }
+  .pulse { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+  .time-chip {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    padding: 5px 12px; border-radius: 20px;
+    font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted);
+  }
+
+  /* ── KPI STRIP ── */
+  .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .kpi {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+  }
+  .kpi.green::before { background: linear-gradient(90deg, #00d4aa, transparent); }
+  .kpi.blue::before { background: linear-gradient(90deg, #0084ff, transparent); }
+  .kpi.red::before { background: linear-gradient(90deg, #ff4d6a, transparent); }
+  .kpi.purple::before { background: linear-gradient(90deg, #a78bfa, transparent); }
+  .kpi:hover { border-color: var(--border2); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: 'DM Mono', monospace; margin-bottom: 8px; }
+  .kpi-val { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; line-height: 1; }
+  .kpi-val.green { color: var(--accent); }
+  .kpi-val.blue { color: var(--accent2); }
+  .kpi-val.red { color: var(--danger); }
+  .kpi-val.purple { color: var(--purple); }
+  .kpi-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .kpi-icon { position: absolute; right: 16px; top: 18px; font-size: 22px; opacity: 0.18; }
+
+  /* ── MAIN GRID ── */
+  .main-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .side-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  .panel {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 20px;
+    overflow: hidden;
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+
+  /* ── PIPELINE ── */
+  .pipeline { display: flex; flex-direction: column; gap: 10px; }
+  .pipe-row { display: flex; align-items: center; gap: 8px; }
+  .pipe-node {
+    flex: 1; padding: 9px 10px;
+    border-radius: 8px; border: 1px solid;
+    font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 500;
+    text-align: center; position: relative;
+  }
+  .pipe-node.kafka { background: rgba(0,132,255,0.08); border-color: rgba(0,132,255,0.3); color: #5ba8ff; }
+  .pipe-node.flink { background: rgba(0,212,170,0.08); border-color: rgba(0,212,170,0.3); color: #00d4aa; }
+  .pipe-node.feat  { background: rgba(255,181,71,0.08); border-color: rgba(255,181,71,0.3); color: #ffb547; }
+  .pipe-node.spark { background: rgba(167,139,250,0.08); border-color: rgba(167,139,250,0.3); color: #a78bfa; }
+  .pipe-node.model { background: rgba(255,77,106,0.08); border-color: rgba(255,77,106,0.3); color: #ff4d6a; }
+  .pipe-node.alert { background: rgba(0,212,170,0.08); border-color: rgba(0,212,170,0.3); color: #00d4aa; }
+  .pipe-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+
+  .feature-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .ftag {
+    font-size: 11px; font-family: 'DM Mono', monospace;
+    padding: 3px 10px; border-radius: 20px; border: 1px solid;
+  }
+  .ftag.b { background: rgba(0,132,255,0.1); border-color: rgba(0,132,255,0.3); color: #5ba8ff; }
+  .ftag.t { background: rgba(255,181,71,0.1); border-color: rgba(255,181,71,0.3); color: #ffb547; }
+  .ftag.n { background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.3); color: #a78bfa; }
+  .ftag.g { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); color: #00d4aa; }
+
+  /* ── LIVE TRANSACTIONS ── */
+  .tx-table { display: flex; flex-direction: column; gap: 0; }
+  .tx-row {
+    display: grid;
+    grid-template-columns: 24px 90px 1fr 80px 64px;
+    align-items: center; gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: none; } }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .tx-id { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+  .tx-info { font-size: 12px; color: var(--text); }
+  .tx-info span { color: var(--muted); font-size: 11px; }
+  .tx-amt { font-family: 'DM Mono', monospace; font-weight: 500; text-align: right; font-size: 12px; }
+  .risk-pill {
+    font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+    padding: 3px 8px; border-radius: 20px; text-align: center; border: 1px solid;
+  }
+  .risk-pill.HIGH { background: rgba(255,77,106,0.12); border-color: rgba(255,77,106,0.3); color: #ff4d6a; }
+  .risk-pill.MED  { background: rgba(255,181,71,0.12); border-color: rgba(255,181,71,0.3); color: #ffb547; }
+  .risk-pill.LOW  { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.25); color: #00d4aa; }
+
+  /* ── THROUGHPUT CHART ── */
+  .chart-wrap { position: relative; height: 160px; }
+
+  /* ── ALGO BARS ── */
+  .algo-list { display: flex; flex-direction: column; gap: 12px; }
+  .algo-row { display: flex; flex-direction: column; gap: 5px; }
+  .algo-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .algo-name { font-size: 12px; color: var(--text); }
+  .algo-pct { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; }
+  .algo-bar-bg { height: 5px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+  .algo-bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+  /* ── DRIFT ── */
+  .drift-list { display: flex; flex-direction: column; gap: 10px; }
+  .drift-item { display: flex; flex-direction: column; gap: 5px; }
+  .drift-top { display: flex; justify-content: space-between; font-size: 12px; }
+  .drift-label { color: var(--text); }
+  .drift-pct { font-family: 'DM Mono', monospace; font-weight: 500; }
+  .drift-bar-bg { height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+  .drift-bar-fill { height: 100%; border-radius: 4px; }
+
+  /* ── GEO HEATMAP ── */
+  .geo-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
+    margin-top: 4px;
+  }
+  .geo-cell {
+    height: 28px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.05);
+    cursor: default;
+    transition: transform 0.1s;
+  }
+  .geo-cell:hover { transform: scale(1.06); }
+
+  /* ── CONFUSION MATRIX ── */
+  .matrix-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+  .matrix-cell {
+    border-radius: 10px; padding: 14px 12px; text-align: center;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .matrix-val { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+  .matrix-lbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ── TIMELINE LOG ── */
+  .log-list { display: flex; flex-direction: column; gap: 0; max-height: 210px; overflow-y: auto; }
+  .log-list::-webkit-scrollbar { width: 4px; }
+  .log-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .log-entry {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 12px; animation: slideIn 0.3s ease;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); min-width: 56px; margin-top: 1px; }
+  .log-icon { font-size: 13px; min-width: 18px; text-align: center; }
+  .log-msg { color: var(--text); line-height: 1.4; }
+  .log-msg b { font-weight: 500; }
+
+  /* ── BOTTOM STRIP ── */
+  .bottom-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+  @media (max-width: 1100px) {
+    .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+    .side-grid { grid-template-columns: 1fr 1fr; }
+    .bottom-strip { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 700px) {
+    .kpi-strip { grid-template-columns: 1fr 1fr; }
+    .side-grid { grid-template-columns: 1fr; }
+    .bottom-strip { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">&#x26A1;</div>
+      <div>
+        <div class="logo-text">FraudShield</div>
+        <div class="logo-sub">Big Data Detection Platform v3.2</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="pulse"></div>LIVE</div>
+      <div class="time-chip" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- KPI STRIP -->
+  <div class="kpi-strip">
+    <div class="kpi green">
+      <div class="kpi-icon">&#x1F4CA;</div>
+      <div class="kpi-label">Transactions / day</div>
+      <div class="kpi-val green" id="kpi-tx">4.71B</div>
+      <div class="kpi-meta">+12.3% vs last week</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-icon">&#x1F6A8;</div>
+      <div class="kpi-label">Fraud Detected</div>
+      <div class="kpi-val red" id="kpi-fraud">218,432</div>
+      <div class="kpi-meta">0.0046% of total volume</div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-icon">&#x26A1;</div>
+      <div class="kpi-label">Avg. Latency</div>
+      <div class="kpi-val blue" id="kpi-lat">38ms</div>
+      <div class="kpi-meta">Stream inference · p99: 82ms</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-icon">&#x1F9E0;</div>
+      <div class="kpi-label">Model Accuracy</div>
+      <div class="kpi-val purple">99.3%</div>
+      <div class="kpi-meta">F1: 0.971 · AUC: 0.998</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID: Pipeline + Live Transactions -->
+  <div class="main-grid">
+
+    <!-- Pipeline -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#00d4aa"></div>Big Data Pipeline Architecture</div>
+      <div class="pipeline">
+        <div class="pipe-row">
+          <div class="pipe-node kafka">&#x2601; Apache Kafka<br><span style="font-size:9px;opacity:0.6">Ingestion · 4.7B/day</span></div>
+          <div class="pipe-arrow">&#x2192;</div>
+          <div class="pipe-node flink">&#x26A1; Apache Flink<br><span style="font-size:9px;opacity:0.6">Stream · sub-second</span></div>
+          <div class="pipe-arrow">&#x2192;</div>
+          <div class="pipe-node feat">&#x2699; Feature Eng.<br><span style="font-size:9px;opacity:0.6">Dynamic signals</span></div>
+        </div>
+        <div class="pipe-row">
+          <div class="pipe-node spark">&#x1F525; Apache Spark<br><span style="font-size:9px;opacity:0.6">Batch · HDFS petabyte</span></div>
+          <div class="pipe-arrow">&#x2192;</div>
+          <div class="pipe-node model">&#x1F9E0; Ensemble Model<br><span style="font-size:9px;opacity:0.6">GBT + RF + GNN + AE</span></div>
+          <div class="pipe-arrow">&#x2192;</div>
+          <div class="pipe-node alert">&#x1F6A8; Alert &amp; Block<br><span style="font-size:9px;opacity:0.6">Real-time action</span></div>
+        </div>
+      </div>
+      <div class="feature-tags">
+        <div class="ftag b">Behavioral signals</div>
+        <div class="ftag t">Temporal patterns</div>
+        <div class="ftag n">Network / GNN</div>
+        <div class="ftag g">Geo-velocity</div>
+        <div class="ftag b">Merchant profiling</div>
+        <div class="ftag t">Device fingerprint</div>
+      </div>
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; line-height:1.7;">
+        Infrastructure: Hadoop HDFS · Fault-tolerant replay · Auto-scaling k8s cluster · 99.99% SLA
+      </div>
+    </div>
+
+    <!-- Live Transactions -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#ff4d6a"></div>Live Transaction Stream</div>
+      <div class="tx-table" id="tx-list"></div>
+    </div>
+
+  </div>
+
+  <!-- SIDE GRID: Throughput + Algos + Drift -->
+  <div class="side-grid">
+
+    <!-- Throughput -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#0084ff"></div>Throughput — txn/sec</div>
+      <div class="chart-wrap">
+        <canvas id="sparkline"></canvas>
+      </div>
+    </div>
+
+    <!-- Algo Performance -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#a78bfa"></div>Ensemble Model Precision</div>
+      <div class="algo-list" id="algo-list"></div>
+    </div>
+
+    <!-- Concept Drift -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#ffb547"></div>Concept Drift Monitor</div>
+      <div class="drift-list" id="drift-list"></div>
+      <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:11px; color:var(--muted); font-family:'DM Mono',monospace;">
+        Retrain trigger: &gt;70% drift &nbsp;|&nbsp; Last retrain: 2h ago
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM STRIP -->
+  <div class="bottom-strip">
+
+    <!-- Geo Heatmap -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#00d4aa"></div>Regional Fraud Heatmap</div>
+      <div class="geo-grid" id="geo-grid"></div>
+    </div>
+
+    <!-- Confusion Matrix -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#0084ff"></div>Model Confusion Matrix</div>
+      <div class="matrix-grid">
+        <div class="matrix-cell" style="background:rgba(0,212,170,0.08);border-color:rgba(0,212,170,0.2);">
+          <div class="matrix-val" style="color:#00d4aa">98.7%</div>
+          <div class="matrix-lbl">True Positive</div>
+        </div>
+        <div class="matrix-cell" style="background:rgba(255,77,106,0.08);border-color:rgba(255,77,106,0.2);">
+          <div class="matrix-val" style="color:#ff4d6a">1.3%</div>
+          <div class="matrix-lbl">False Negative</div>
+        </div>
+        <div class="matrix-cell" style="background:rgba(255,181,71,0.08);border-color:rgba(255,181,71,0.2);">
+          <div class="matrix-val" style="color:#ffb547">0.7%</div>
+          <div class="matrix-lbl">False Positive</div>
+        </div>
+        <div class="matrix-cell" style="background:rgba(0,132,255,0.08);border-color:rgba(0,132,255,0.2);">
+          <div class="matrix-val" style="color:#0084ff">99.3%</div>
+          <div class="matrix-lbl">True Negative</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:#ff4d6a"></div>System Event Log</div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ── Clock ──
+function updateClock(){
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false});
+}
+updateClock(); setInterval(updateClock, 1000);
+
+// ── Helpers ──
+function rnd(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function fmtAmt(v){ return '$'+v.toLocaleString(); }
+
+// ── KPI live flicker ──
+setInterval(()=>{
+  document.getElementById('kpi-tx').textContent = (4.69 + Math.random()*0.05).toFixed(2)+'B';
+  document.getElementById('kpi-fraud').textContent = (215000 + rnd(0,6000)).toLocaleString();
+  document.getElementById('kpi-lat').textContent = rnd(32,48)+'ms';
+}, 3000);
+
+// ── Throughput Sparkline ──
+const sparkData = Array.from({length:60}, ()=> rnd(30000,75000));
+const ctx = document.getElementById('sparkline').getContext('2d');
+const sparkChart = new Chart(ctx, {
+  type:'line',
+  data:{
+    labels: sparkData.map((_,i)=> i===59?'now':''),
+    datasets:[{
+      data: sparkData,
+      borderColor:'#00d4aa', borderWidth:1.5,
+      pointRadius:0, fill:true,
+      backgroundColor: (ctx)=>{
+        const g = ctx.chart.ctx.createLinearGradient(0,0,0,160);
+        g.addColorStop(0,'rgba(0,212,170,0.18)');
+        g.addColorStop(1,'rgba(0,212,170,0)');
+        return g;
+      },
+      tension:0.4,
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:false,
+    plugins:{ legend:{display:false}, tooltip:{
+      callbacks:{ label: c => c.parsed.y.toLocaleString()+' txn/s' }
+    }},
+    scales:{
+      x:{display:false},
+      y:{
+        display:true,
+        grid:{ color:'rgba(255,255,255,0.04)' },
+        ticks:{ color:'#6b7a94', font:{size:10}, callback: v => (v/1000).toFixed(0)+'K', maxTicksLimit:4 },
+        border:{ display:false }
+      }
+    }
+  }
+});
+setInterval(()=>{
+  sparkData.shift(); sparkData.push(rnd(30000,75000));
+  sparkChart.update('none');
+}, 1200);
+
+// ── Transactions ──
+const regions = ['US-West','EU-Central','APAC','LATAM','MEA','US-East'];
+const merchants = ['E-Commerce','Banking','Telecom','Crypto Exchange','Retail','FinTech'];
+let txCache = [];
+function genTx(){
+  const fraud = Math.random() < 0.18;
+  return {
+    id: 'TX'+rnd(100000,999999),
+    region: regions[rnd(0,5)],
+    merchant: merchants[rnd(0,5)],
+    amount: fraud ? rnd(2000,19000) : rnd(5,1800),
+    risk: fraud ? (Math.random()<0.6?'HIGH':'MED') : 'LOW',
+  };
+}
+function dotCol(r){ return r==='HIGH'?'#ff4d6a':r==='MED'?'#ffb547':'#00d4aa'; }
+function renderTx(){
+  txCache.unshift(genTx());
+  if(txCache.length>7) txCache.pop();
+  document.getElementById('tx-list').innerHTML = txCache.map(t=>`
+    <div class="tx-row">
+      <div class="tx-dot" style="background:${dotCol(t.risk)};box-shadow:0 0 6px ${dotCol(t.risk)}50;"></div>
+      <div class="tx-id">${t.id}</div>
+      <div class="tx-info">${t.merchant}<br><span>${t.region}</span></div>
+      <div class="tx-amt" style="color:${dotCol(t.risk)}">${fmtAmt(t.amount)}</div>
+      <div class="risk-pill ${t.risk}">${t.risk}</div>
+    </div>
+  `).join('');
+}
+for(let i=0;i<7;i++) txCache.push(genTx());
+renderTx();
+setInterval(renderTx, 1400);
+
+// ── Algo bars ──
+const algos = [
+  { name:'Gradient Boosted Trees', pct:97, color:'#00d4aa' },
+  { name:'Random Forest',           pct:95, color:'#0084ff' },
+  { name:'Graph Neural Network',    pct:92, color:'#a78bfa' },
+  { name:'Autoencoder (anomaly)',   pct:88, color:'#ffb547' },
+];
+document.getElementById('algo-list').innerHTML = algos.map(a=>`
+  <div class="algo-row">
+    <div class="algo-top">
+      <span class="algo-name">${a.name}</span>
+      <span class="algo-pct" style="color:${a.color}">${a.pct}%</span>
+    </div>
+    <div class="algo-bar-bg">
+      <div class="algo-bar-fill" style="width:${a.pct}%;background:${a.color};box-shadow:0 0 8px ${a.color}60;"></div>
+    </div>
+  </div>
+`).join('');
+
+// ── Drift ──
+const drifts = [
+  { label:'Card-not-present',  pct:58, color:'#ff4d6a' },
+  { label:'Account takeover',  pct:43, color:'#ffb547' },
+  { label:'Synthetic ID',      pct:71, color:'#ff4d6a' },
+  { label:'Promo abuse',       pct:29, color:'#00d4aa' },
+];
+document.getElementById('drift-list').innerHTML = drifts.map(d=>`
+  <div class="drift-item">
+    <div class="drift-top">
+      <span class="drift-label">${d.label}</span>
+      <span class="drift-pct" style="color:${d.color}">${d.pct}%${d.pct>70?' ⚠':'  '}</span>
+    </div>
+    <div class="drift-bar-bg">
+      <div class="drift-bar-fill" style="width:${d.pct}%;background:${d.color};box-shadow:0 0 6px ${d.color}60;"></div>
+    </div>
+  </div>
+`).join('');
+
+// ── Geo Heatmap ──
+const geoRegions = [
+  {label:'US-W',v:88},{label:'US-E',v:72},{label:'EU-W',v:61},{label:'EU-C',v:55},{label:'EU-E',v:40},
+  {label:'APAC',v:95},{label:'SEA', v:78},{label:'IND', v:65},{label:'CHN', v:50},{label:'JPN', v:30},
+  {label:'MEA', v:82},{label:'AFR', v:45},{label:'GCC', v:57},{label:'TRK', v:38},{label:'EGY', v:44},
+  {label:'LATAM',v:70},{label:'BRZ',v:60},{label:'ARG',v:35},{label:'MEX',v:52},{label:'COL',v:41},
+];
+function heatColor(v){
+  if(v>=80) return {bg:'rgba(255,77,106,0.3)',border:'rgba(255,77,106,0.5)',color:'#ff8fa0'};
+  if(v>=60) return {bg:'rgba(255,181,71,0.2)',border:'rgba(255,181,71,0.4)',color:'#ffb547'};
+  if(v>=40) return {bg:'rgba(0,132,255,0.15)',border:'rgba(0,132,255,0.3)',color:'#5ba8ff'};
+  return {bg:'rgba(0,212,170,0.1)',border:'rgba(0,212,170,0.25)',color:'#00d4aa'};
+}
+document.getElementById('geo-grid').innerHTML = geoRegions.map(r=>{
+  const c=heatColor(r.v);
+  return `<div class="geo-cell" title="${r.label}: ${r.v}% risk" style="background:${c.bg};border-color:${c.border};color:${c.color};">${r.label}</div>`;
+}).join('');
+
+// ── Event Log ──
+const logTypes = [
+  { icon:'🚨', templ: ()=>`<b>HIGH-RISK</b> TX${rnd(100000,999999)} flagged · $${rnd(5000,18000).toLocaleString()} · ${regions[rnd(0,5)]}`, col:'#ff4d6a' },
+  { icon:'⚙️', templ: ()=>`Model retrain triggered — Synthetic ID drift at ${rnd(71,89)}%`, col:'#ffb547' },
+  { icon:'✅', templ: ()=>`Cluster autoscaled to ${rnd(48,96)} nodes · throughput stable`, col:'#00d4aa' },
+  { icon:'🔁', templ: ()=>`Kafka consumer lag: ${rnd(10,200)}ms · offset ${rnd(1,99)}M`, col:'#5ba8ff' },
+  { icon:'⚡', templ: ()=>`Flink checkpoint complete — ${rnd(2,8)}GB state serialized`, col:'#a78bfa' },
+  { icon:'🛑', templ: ()=>`Card-not-present burst detected — ${rnd(200,800)} tx/s spike`, col:'#ff4d6a' },
+];
+let logCache = [];
+function addLog(){
+  const type = logTypes[rnd(0,logTypes.length-1)];
+  const now = new Date();
+  const t = now.toLocaleTimeString('en-US',{hour12:false});
+  logCache.unshift({ time:t, icon:type.icon, msg:type.templ(), col:type.col });
+  if(logCache.length>10) logCache.pop();
+  document.getElementById('log-list').innerHTML = logCache.map(l=>`
+    <div class="log-entry">
+      <div class="log-time">${l.time}</div>
+      <div class="log-icon">${l.icon}</div>
+      <div class="log-msg" style="color:${l.col}">${l.msg}</div>
+    </div>
+  `).join('');
+}
+for(let i=0;i<6;i++) addLog();
+setInterval(addLog, 2800);
+</script>
+</body>
+</html>
