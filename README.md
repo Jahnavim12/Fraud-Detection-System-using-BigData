@@ -171,12 +171,6 @@ Simply launch the dashboard in a modern web browser to view:
 
 ---
 
-## 📜 License
-
-This project is developed for educational, research, and demonstration purposes.
-
----
-
 ## 👨‍💻 Author
 
 **Jahnavi**  
